@@ -61,11 +61,21 @@ services:
     build: './payment-service'
     container_name: payment_service
     restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    volumes:
+      - ./payment-service:/app
     depends_on:
       - rabbitmq
       - order-service
     networks:
       - tcc-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   tcc-network:
