@@ -3,6 +3,7 @@ import uvicorn
 from orders.routers.orders_routers import router
 from shared.database import Base, engine
 from shared.rebbitmq import connect_to_rabbitmq
+from payment_consumer import start_payment_event_consumer
 
 # Importar os models para que o SQLAlchemy os reconheça
 from orders.models.order import Order
@@ -73,6 +74,17 @@ def init_rabbitmq():
         print("💡 Verifique se o RabbitMQ está rodando")
 
 
+def init_payment_consumer():
+    """Inicializa o consumidor de eventos de pagamento"""
+    try:
+        print("💳 Inicializando consumidor de eventos de pagamento...")
+        start_payment_event_consumer()
+        print("✅ Consumidor de pagamentos iniciado com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar consumidor de pagamentos: {e}")
+        print("💡 Verifique se o payment-service está rodando")
+
+
 def init_app():
     """Inicializa a aplicação FastAPI"""
     app = FastAPI(
@@ -86,6 +98,9 @@ def init_app():
     
     # Inicializar RabbitMQ
     init_rabbitmq()
+    
+    # Inicializar consumidor de eventos de pagamento
+    init_payment_consumer()
     
     # Registrar routers
     app.include_router(router=router)

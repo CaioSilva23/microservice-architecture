@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from decimal import Decimal
 from typing import List, Optional
@@ -62,3 +62,66 @@ def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderRe
     )
 
     return novo_pedido
+
+
+@router.get(
+    path="/{order_id}/status",
+    summary="Verificar status do pedido",
+    response_model=dict
+)
+def get_order_status(order_id: int, db: Session = Depends(get_db)) -> dict:
+    """
+    Função para verificar o status de um pedido específico.
+    Útil para acompanhar se o pagamento foi processado.
+    """
+    order = db.query(Order).filter(Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    
+    return {
+        "id": order.id,
+        "codigo": order.codigo,
+        "status": order.status,
+        "valor": str(order.valor),
+        "data": order.data.isoformat(),
+        "status_description": {
+            "PENDING": "Aguardando pagamento",
+            "PAID": "Pagamento confirmado",
+            "PAYMENT_FAILED": "Falha no pagamento",
+            "PAYMENT_PENDING": "Pagamento em processamento"
+        }.get(order.status, "Status desconhecido")
+    }
+
+
+@router.get(
+    path="/status/summary",
+    summary="Resumo de status dos pedidos",
+    response_model=dict
+)
+def get_orders_status_summary(db: Session = Depends(get_db)) -> dict:
+    """
+    Função para obter um resumo dos status de todos os pedidos.
+    Útil para dashboard e monitoramento.
+    """
+    from sqlalchemy import func
+    
+    status_counts = db.query(
+        Order.status,
+        func.count(Order.id).label('count')
+    ).group_by(Order.status).all()
+    
+    total_orders = db.query(func.count(Order.id)).scalar()
+    
+    return {
+        "total_orders": total_orders,
+        "status_breakdown": {
+            status: count for status, count in status_counts
+        },
+        "status_descriptions": {
+            "PENDING": "Aguardando pagamento",
+            "PAID": "Pagamento confirmado",
+            "PAYMENT_FAILED": "Falha no pagamento",
+            "PAYMENT_PENDING": "Pagamento em processamento"
+        }
+    }
