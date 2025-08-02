@@ -21,26 +21,34 @@ def connect_to_rabbitmq(retries=5, delay=3, queue_name='order_queue'):
             connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
             channel = connection.channel()
             
-            # Declarar a fila
+            # Declarar a fila principal (order_queue)
             channel.queue_declare(queue=queue_name)
             
-            # Declarar o exchange para pagamentos
+            # Declarar o exchange FANOUT para distribuir pagamentos para múltiplos serviços
             channel.exchange_declare(
-                exchange='payments',
-                exchange_type='direct',
+                exchange='payment_events',
+                exchange_type='fanout',
                 durable=True
             )
             
-            # Declarar a fila de pagamentos e fazer o bind
-            channel.queue_declare(queue='payment_queue', durable=True)
+            # Declarar filas específicas para cada serviço
+            # Fila para o order-service (atualizar status do pedido)
+            channel.queue_declare(queue='order_payment_updates', durable=True)
             channel.queue_bind(
-                exchange='payments',
-                queue='payment_queue',
-                routing_key='payment.created'
+                exchange='payment_events',
+                queue='order_payment_updates'
+            )
+            
+            # Fila para o notification-service (enviar notificações)
+            channel.queue_declare(queue='notification_payment_events', durable=True)
+            channel.queue_bind(
+                exchange='payment_events',
+                queue='notification_payment_events'
             )
             
             logger.info(f"Conectado a fila {queue_name} com sucesso.")
-            logger.info("Exchange 'payments' e fila 'payment_queue' configurados.")
+            logger.info("Exchange 'payment_events' (fanout) configurado.")
+            logger.info("Filas 'order_payment_updates' e 'notification_payment_events' criadas.")
             return channel
         except pika.exceptions.AMQPConnectionError as e:
             logger.warning(f"[Tentativa {i+1}] Falha ao conectar a fila {queue_name}: {e}")
@@ -48,15 +56,15 @@ def connect_to_rabbitmq(retries=5, delay=3, queue_name='order_queue'):
     raise Exception(f"Não foi possível conectar a fila {queue_name} após várias tentativas.")
 
 
-def publish_message(channel, exchange, routing_key, body):
-    """Publica uma mensagem no RabbitMQ usando o canal existente"""
+def publish_message(channel, exchange, body):
+    """Publica uma mensagem no RabbitMQ usando fanout exchange"""
     try:
         channel.basic_publish(
             exchange=exchange,
-            routing_key=routing_key,
+            routing_key='',  # Fanout não usa routing_key
             body=json.dumps(body)
         )
-        logger.info(f"Mensagem publicada: {body}")
+        logger.info(f"Evento de pagamento publicado para todos os serviços: {body}")
     except Exception as e:
         logger.error(f"Erro ao publicar mensagem: {e}")
 
@@ -69,17 +77,24 @@ def callback(ch, method, properties, body):
         order = json.loads(body)
         logger.info(f"Processando pedido: {order.get('codigo', 'N/A')}")
 
+        # Preparar evento de pagamento para múltiplos serviços
+        payment_event = {
+            "payment_id": f"pay_{order.get('id', 'unknown')}",
+            "order_id": order.get('id'),
+            "order_code": order.get('codigo'),
+            "status": "success",
+            "amount": order.get('valor', 0),
+            "timestamp": time.time(),
+            "event_type": "payment_processed"
+        }
+
+        # Publicar evento para todos os serviços interessados
         publish_message(
             channel=ch,
-            exchange='payments',
-            routing_key='payment.created',
-            body={
-                "id": order.get('id'),
-                "status": "success",
-            }
+            exchange='payment_events',
+            body=payment_event
         )
 
-        # Simular processamento de pagamento
         logger.info("Pagamento processado com sucesso!")
 
     except Exception as e:
