@@ -57,6 +57,16 @@ services:
     networks:
       - tcc-network
   
+  payment-service:
+    build: './payment-service'
+    container_name: payment_service
+    restart: always
+    depends_on:
+      - rabbitmq
+      - order-service
+    networks:
+      - tcc-network
+
 networks:
   tcc-network:
     driver: bridge
