@@ -10,3 +10,4 @@ class Order(Base):
     codigo = Column(String(100), nullable=False)
     valor = Column(Numeric, nullable=False)
     data = Column(DateTime, nullable=False, default=datetime.now)
+    status = Column(String(50), nullable=False, default="PENDING")

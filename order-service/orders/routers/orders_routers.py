@@ -5,34 +5,12 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 from shared.depedencies import get_db
+from shared.rebbitmq import publish_message
 from orders.models.order import Order
+from orders.serializers import OrderRequest, OrderResponse
 
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
-
-
-class OrderResponse(BaseModel):
-    """
-    Classe de resposta para pedidos.
-    Contém os atributos id e nome.
-    """
-    id: int
-    codigo: str
-    valor: Decimal
-    data: datetime
-
-    class Config:
-        orm_mode = True
-
-
-class OrderRequest(BaseModel):
-    """
-    Classe de requisição para pedidos.
-    Contém os atributos código, valor e data (opcional - usa data atual se não informada).
-    """
-    codigo: str
-    valor: Decimal
-    data: Optional[datetime] = None
 
 
 @router.get("/listar", summary="List orders")
@@ -57,10 +35,10 @@ def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderRe
     Se a data não for fornecida, usa a data/hora atual.
     Retorna o pedido criado.
     """
-    
+
     # Preparar dados do pedido
     pedido_data = pedido.model_dump()
-    
+
     # Se data não foi fornecida, usar data atual
     if pedido_data['data'] is None:
         pedido_data['data'] = datetime.now()
@@ -69,5 +47,18 @@ def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderRe
     db.add(novo_pedido)
     db.commit()
     db.refresh(novo_pedido)
+
+    # Publicar mensagem no RabbitMQ
+    publish_message(
+        exchange='orders',
+        routing_key='order.created',
+        body={
+            "id": novo_pedido.id,
+            # "cliente_id": novo_pedido.cliente_id,
+            "valor": str(novo_pedido.valor),
+            "data": novo_pedido.data.isoformat(),
+            "status": novo_pedido.status
+        }
+    )
 
     return novo_pedido

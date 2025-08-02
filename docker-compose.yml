@@ -1,5 +1,5 @@
 volumes:
-  pg_flask:
+  tcc_pg_data:
 
 services:
   db:
@@ -13,9 +13,19 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pg_flask:/var/lib/postgresql/data
+      - tcc_pg_data:/var/lib/postgresql/data
     networks:
-      - app-network
+      - tcc-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: tcc-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - tcc-network
 
   order-service:
     build: './order-service'
@@ -31,8 +41,9 @@ services:
       - "8000"
     depends_on:
       - db
+      - rabbitmq
     networks:
-      - app-network
+      - tcc-network
     volumes:
       - ./order-service:/app
 
@@ -44,8 +55,8 @@ services:
     depends_on:
       - order-service
     networks:
-      - app-network
-
+      - tcc-network
+  
 networks:
-  app-network:
+  tcc-network:
     driver: bridge
