@@ -4,27 +4,28 @@ import json
 
 
 def connect_to_rabbitmq(retries=5, delay=3):
+    """Conecta ao RabbitMQ e declara a fila 'order_queue'"""
     for i in range(retries):
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
             channel = connection.channel()
-            
+
             # Declarar exchange
             channel.exchange_declare(
                 exchange='orders',
                 exchange_type='topic'
             )
-            
+
             # Declarar fila
             channel.queue_declare(queue="order_queue")
-            
+
             # Binding da fila ao exchange
             channel.queue_bind(
                 exchange='orders',
                 queue='order_queue',
                 routing_key='order.*'
             )
-            
+
             print("Conectado ao RabbitMQ com sucesso.")
             return channel
         except pika.exceptions.AMQPConnectionError as e:
@@ -40,13 +41,14 @@ channel = connect_to_rabbitmq()
 
 
 def publish_message(exchange, routing_key, body):
+    """Publica uma mensagem no RabbitMQ"""
     global channel
     try:
         # Verificar se o canal ainda está aberto
         if channel.is_closed:
             print("Canal fechado, reconectando...")
             channel = connect_to_rabbitmq()
-        
+
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
