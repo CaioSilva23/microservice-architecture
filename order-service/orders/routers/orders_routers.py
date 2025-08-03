@@ -48,18 +48,27 @@ def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderRe
     db.commit()
     db.refresh(novo_pedido)
 
-    # Publicar mensagem no RabbitMQ
-    publish_message(
-        exchange='orders',
-        routing_key='order.created',
-        body={
-            "id": novo_pedido.id,
-            # "cliente_id": novo_pedido.cliente_id,
-            "valor": str(novo_pedido.valor),
-            "data": novo_pedido.data.isoformat(),
-            "status": novo_pedido.status
-        }
-    )
+    event = {
+            "event_type": "order_realized",
+            "event_timestamp": datetime.now().isoformat(),
+            "order_data": {
+                "id": novo_pedido.id,
+                "codigo": novo_pedido.codigo,
+                "valor": str(novo_pedido.valor),
+                "data": novo_pedido.data.isoformat(),
+                "status": novo_pedido.status
+            },
+            "message": (
+                f"Pedido {novo_pedido.codigo} foi realizado com sucesso"
+            ),
+            "metadata": {
+                "service": "order-service",
+                "version": "1.0.0"
+            }
+    }
+
+    # Publicar evento de pedido realizado no RabbitMQ
+    publish_message(event=event)
 
     return novo_pedido
 

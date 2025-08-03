@@ -3,68 +3,39 @@ import time
 import json
 
 
-def connect_to_rabbitmq(retries=5, delay=3):
-    """Conecta ao RabbitMQ e declara a fila 'order_queue'"""
-    for i in range(retries):
-        try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
-            channel = connection.channel()
+def publish_message(event: dict):
+    """Publica um evento no RabbitMQ usando o exchange 'order.created'.
+    O evento é enviado como uma mensagem JSON.
+    """
 
-            # Declarar exchange
-            channel.exchange_declare(
-                exchange='orders',
-                exchange_type='topic'
-            )
+    # Conexão com RabbitMQ
+    conexao = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+    canal = conexao.channel()
 
-            # Declarar fila
-            channel.queue_declare(queue="order_queue")
+    # Declara o exchange do tipo fanout (broadcast)
+    canal.exchange_declare(exchange='order.created', exchange_type='fanout', durable=True)
 
-            # Binding da fila ao exchange
-            channel.queue_bind(
-                exchange='orders',
-                queue='order_queue',
-                routing_key='order.*'
-            )
+    # Declarar fila
+    canal.queue_declare(queue="order_queue")
 
-            print("Conectado ao RabbitMQ com sucesso.")
-            return channel
-        except pika.exceptions.AMQPConnectionError as e:
-            print(f"[Tentativa {i+1}] Falha ao conectar ao RabbitMQ: {e}")
-            time.sleep(delay)
-    raise Exception(
-        "Não foi possível conectar ao RabbitMQ após várias tentativas."
+    # Binding da fila ao exchange
+    canal.queue_bind(
+        exchange='order.created',
+        queue='order_queue',
+        routing_key=''
     )
 
+    # Serializa o evento para JSON
+    corpo_mensagem = json.dumps(event)
 
-# Conectar no startup do app
-channel = connect_to_rabbitmq()
-
-
-def publish_message(exchange, routing_key, body):
-    """Publica uma mensagem no RabbitMQ"""
-    global channel
-    try:
-        # Verificar se o canal ainda está aberto
-        if channel.is_closed:
-            print("Canal fechado, reconectando...")
-            channel = connect_to_rabbitmq()
-
-        channel.basic_publish(
-            exchange=exchange,
-            routing_key=routing_key,
-            body=json.dumps(body)
+    # Publica a mensagem no exchange
+    canal.basic_publish(
+        exchange='order.created',
+        routing_key='',  # Fanout ignora routing_key
+        body=corpo_mensagem,
+        properties=pika.BasicProperties(
+            delivery_mode=2  # Faz a mensagem ser persistente
         )
-        print(f"Mensagem publicada: {body}")
-    except pika.exceptions.AMQPError as e:
-        print(f"Erro ao publicar mensagem: {e}")
-        # Tentar reconectar e publicar novamente
-        try:
-            channel = connect_to_rabbitmq()
-            channel.basic_publish(
-                exchange=exchange,
-                routing_key=routing_key,
-                body=json.dumps(body)
-            )
-            print(f"Mensagem publicada após reconexão: {body}")
-        except Exception as reconnect_error:
-            print(f"Falha ao reconectar e publicar: {reconnect_error}")
+    )
+    print(f"[x] Evento 'OrderCreated' enviado: {corpo_mensagem}")
+    conexao.close()
