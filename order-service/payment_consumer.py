@@ -21,10 +21,10 @@ def connect_to_payment_events(retries=5, delay=3):
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
             channel = connection.channel()
-            
+
             # Verificar se a fila existe (criada pelo payment-service)
             channel.queue_declare(queue='order_payment_updates', durable=True)
-            
+
             logger.info("Conectado à fila de eventos de pagamento com sucesso.")
             return channel
         except pika.exceptions.AMQPConnectionError as e:
@@ -60,14 +60,14 @@ def payment_event_callback(ch, method, properties, body):
     try:
         payment_event = json.loads(body)
         logger.info(f"Evento de pagamento recebido: {payment_event}")
-        
+
         order_id = payment_event.get('order_id')
         payment_status = payment_event.get('status')
-        
+
         if not order_id:
             logger.error("Evento de pagamento sem order_id")
             return
-        
+
         # Mapear status de pagamento para status do pedido
         if payment_status == 'success':
             new_status = 'SUCCESS'
@@ -76,15 +76,15 @@ def payment_event_callback(ch, method, properties, body):
         else:
             logger.warning(f"Status de pagamento desconhecido: {payment_status}")
             new_status = 'PAYMENT_PENDING'
-        
+
         # Atualizar status do pedido
         success = update_order_status(order_id, new_status)
-        
+
         if success:
             logger.info(f"Pedido {order_id} processado com sucesso - Status: {new_status}")
         else:
             logger.error(f"Falha ao processar pedido {order_id}")
-            
+
     except json.JSONDecodeError as e:
         logger.error(f"Erro ao decodificar JSON: {e}")
     except Exception as e:
@@ -96,21 +96,21 @@ def start_payment_event_consumer():
     def consumer_thread():
         try:
             logger.info("=== INICIANDO CONSUMIDOR DE EVENTOS DE PAGAMENTO ===")
-            
+
             channel = connect_to_payment_events()
-            
+
             channel.basic_consume(
                 queue='order_payment_updates',
                 on_message_callback=payment_event_callback,
                 auto_ack=True
             )
-            
+
             logger.info("Aguardando eventos de pagamento...")
             channel.start_consuming()
-            
+
         except Exception as e:
             logger.error(f"Erro no consumidor de eventos de pagamento: {e}")
-    
+
     # Iniciar consumidor em thread separada para não bloquear a aplicação
     thread = threading.Thread(target=consumer_thread, daemon=True)
     thread.start()
@@ -120,7 +120,7 @@ def start_payment_event_consumer():
 if __name__ == "__main__":
     # Para teste isolado
     start_payment_event_consumer()
-    
+
     # Manter o processo vivo
     try:
         while True:
