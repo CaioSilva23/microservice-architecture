@@ -75,10 +75,10 @@ def get_order_status(order_id: int, db: Session = Depends(get_db)) -> dict:
     Útil para acompanhar se o pagamento foi processado.
     """
     order = db.query(Order).filter(Order.id == order_id).first()
-    
+
     if not order:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     return {
         "id": order.id,
         "codigo": order.codigo,
@@ -87,7 +87,7 @@ def get_order_status(order_id: int, db: Session = Depends(get_db)) -> dict:
         "data": order.data.isoformat(),
         "status_description": {
             "PENDING": "Aguardando pagamento",
-            "PAID": "Pagamento confirmado",
+            "SUCCESS": "Pagamento confirmado",
             "PAYMENT_FAILED": "Falha no pagamento",
             "PAYMENT_PENDING": "Pagamento em processamento"
         }.get(order.status, "Status desconhecido")
@@ -105,14 +105,14 @@ def get_orders_status_summary(db: Session = Depends(get_db)) -> dict:
     Útil para dashboard e monitoramento.
     """
     from sqlalchemy import func
-    
+
     status_counts = db.query(
         Order.status,
         func.count(Order.id).label('count')
     ).group_by(Order.status).all()
-    
+
     total_orders = db.query(func.count(Order.id)).scalar()
-    
+
     return {
         "total_orders": total_orders,
         "status_breakdown": {
