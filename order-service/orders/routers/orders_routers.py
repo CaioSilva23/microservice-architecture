@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 from shared.depedencies import get_db
-from shared.rebbitmq import publish_message
+from shared.produtor import publish_message
 from orders.models.order import Order
 from orders.serializers import OrderRequest, OrderResponse
 
