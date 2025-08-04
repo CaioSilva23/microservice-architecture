@@ -2,7 +2,6 @@ from fastapi import FastAPI
 import uvicorn
 from orders.routers.orders_routers import router
 from shared.database import Base, engine
-from shared.rebbitmq import connect_to_rabbitmq
 from payment_consumer import start_payment_event_consumer
 
 
@@ -63,18 +62,6 @@ def create_tables():
         print("💡 Verifique se o PostgreSQL está rodando e "
               "as credenciais no .env estão corretas")
 
-
-def init_rabbitmq():
-    """Inicializa a conexão com RabbitMQ"""
-    try:
-        print("🐰 Inicializando conexão com RabbitMQ...")
-        connect_to_rabbitmq()
-        print("✅ RabbitMQ configurado com sucesso!")
-    except Exception as e:
-        print(f"❌ Erro ao conectar com RabbitMQ: {e}")
-        print("💡 Verifique se o RabbitMQ está rodando")
-
-
 def init_payment_consumer():
     """Inicializa o consumidor de eventos de pagamento"""
     try:
@@ -96,9 +83,6 @@ def init_app():
 
     # Criar tabelas na inicialização
     create_tables()
-
-    # Inicializar RabbitMQ
-    init_rabbitmq()
 
     # Inicializar consumidor de eventos de pagamento
     init_payment_consumer()

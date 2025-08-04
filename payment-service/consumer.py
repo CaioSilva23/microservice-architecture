@@ -3,6 +3,8 @@ import json
 import time
 import logging
 import sys
+from produtor import publish_message
+
 
 # Configuração de logging para Docker
 logging.basicConfig(
@@ -15,90 +17,34 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def connect_to_rabbitmq(retries=5, delay=3, queue_name='order_queue'):
-    for i in range(retries):
-        try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
-            channel = connection.channel()
-            
-            # Declarar a fila principal (order_queue)
-            channel.queue_declare(queue=queue_name)
-            
-            # Declarar o exchange FANOUT para distribuir pagamentos para múltiplos serviços
-            channel.exchange_declare(
-                exchange='payment_events',
-                exchange_type='fanout',
-                durable=True
-            )
-            
-            # Declarar filas específicas para cada serviço
-            # Fila para o order-service (atualizar status do pedido)
-            channel.queue_declare(queue='order_payment_updates', durable=True)
-            channel.queue_bind(
-                exchange='payment_events',
-                queue='order_payment_updates'
-            )
-            
-            # Fila para o notification-service (enviar notificações)
-            channel.queue_declare(queue='notification_payment_events', durable=True)
-            channel.queue_bind(
-                exchange='payment_events',
-                queue='notification_payment_events'
-            )
-            
-            logger.info(f"Conectado a fila {queue_name} com sucesso.")
-            logger.info("Exchange 'payment_events' (fanout) configurado.")
-            logger.info("Filas 'order_payment_updates' e 'notification_payment_events' criadas.")
-            return channel
-        except pika.exceptions.AMQPConnectionError as e:
-            logger.warning(f"[Tentativa {i+1}] Falha ao conectar a fila {queue_name}: {e}")
-            time.sleep(delay)
-    raise Exception(f"Não foi possível conectar a fila {queue_name} após várias tentativas.")
+def process_payment(ch, method, properties, body):
+    evento = json.loads(body)
+    logger.info(f"[✔] PedidoCriado recebido: {evento}")
 
+    # Simular o processamento (ex: iniciar pagamento)
+    payload = evento.get('order_data', {})
 
-def publish_message(channel, exchange, body):
-    """Publica uma mensagem no RabbitMQ usando fanout exchange"""
-    try:
-        channel.basic_publish(
-            exchange=exchange,
-            routing_key='',  # Fanout não usa routing_key
-            body=json.dumps(body)
-        )
-        logger.info(f"Evento de pagamento publicado para todos os serviços: {body}")
-    except Exception as e:
-        logger.error(f"Erro ao publicar mensagem: {e}")
+    pedido_id = payload.get("codigo")
+    logger.info(f"→ Iniciando processamento de pagamento para o pedido {pedido_id}")
+    time.sleep(5)  # Simula o tempo de processamento
 
-
-def callback(ch, method, properties, body):
-    time.sleep(3)  # Simular processamento lento
-    try:
-        logger.info("Mensagem recebida!")
-
-        order = json.loads(body)
-        logger.info(f"Processando pedido: {order.get('codigo', 'N/A')}")
-
-        # Preparar evento de pagamento para múltiplos serviços
-        payment_event = {
-            "payment_id": f"pay_{order.get('id', 'unknown')}",
-            "order_id": order.get('id'),
-            "order_code": order.get('codigo'),
-            "status": "success",
-            "amount": order.get('valor', 0),
-            "timestamp": time.time(),
-            "event_type": "payment_processed"
+    publish_message({
+        "evento": "PaymentProcessed",
+        "codigo": pedido_id,
+        "id": payload.get("id"),
+        "valor": payload.get("valor"),
+        "status": "SUCCESS",
+        "data": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+        "metadata": {
+            "source": "payment-service",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         }
+    })
 
-        # Publicar evento para todos os serviços interessados
-        publish_message(
-            channel=ch,
-            exchange='payment_events',
-            body=payment_event
-        )
+    logger.info(f"[✔] Pagamento processado com sucesso para o pedido {pedido_id}")
 
-        logger.info("Pagamento processado com sucesso!")
-
-    except Exception as e:
-        logger.error(f"Erro ao processar mensagem: {e}")
+    # Confirma que a mensagem foi processada
+    ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 def main():
@@ -106,25 +52,28 @@ def main():
     logger.info("=== INICIANDO PAYMENT SERVICE ===")
 
     logger.info("Conectando ao RabbitMQ...")
-    channel = connect_to_rabbitmq(queue_name="order_queue")
+    conexao = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+    canal = conexao.channel()
 
     logger.info("Configurando consumidor da fila order_queue...")
 
-    channel.basic_consume(
-        queue="order_queue",
-        on_message_callback=callback,
-        auto_ack=True
-    )
+    # Declara o mesmo exchange usado pelo produtor
+    canal.exchange_declare(exchange='order.created', exchange_type='fanout', durable=True)
 
-    logger.info("Aguardando mensagens... ")
+    # Declara a fila (pode ser uma por serviço)
+    nome_fila = 'order_payment'
+    canal.queue_declare(queue=nome_fila, durable=True)
 
-    try:
-        channel.start_consuming()
-    except KeyboardInterrupt:
-        logger.info("Interrompido manualmente. Encerrando consumidor.")
-        channel.stop_consuming()
-    except Exception as e:
-        logger.error(f"Erro inesperado: {e}")
+    # Liga a fila ao exchange
+    canal.queue_bind(exchange='order.created', queue=nome_fila)
+
+    logger.info(f"[🎧] Aguardando eventos 'PedidoCriado' na fila {nome_fila}...")
+
+    # Define o callback para processar mensagens
+    canal.basic_consume(queue=nome_fila, on_message_callback=process_payment)
+
+    # Inicia o consumo
+    canal.start_consuming()
 
 
 if __name__ == "__main__":
