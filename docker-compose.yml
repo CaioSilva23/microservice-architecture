@@ -1,10 +1,13 @@
 volumes:
-  tcc_pg_data:
+  pg-data-order-service:
+    driver: local
+  pg-data-payment-service:
+    driver: local
 
 services:
-  db:
+  db-order-service:
     image: postgres:latest
-    container_name: postgres_db
+    container_name: postgres_db_order_service
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -13,7 +16,22 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - tcc_pg_data:/var/lib/postgresql/data
+      - pg-data-order-service:/var/lib/postgresql/data
+    networks:
+      - tcc-network
+
+  db-payment-service:
+    image: postgres:latest
+    container_name: postgres_db_payment_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-data-payment-service:/var/lib/postgresql/data
     networks:
       - tcc-network
 
@@ -40,7 +58,7 @@ services:
     expose:
       - "8000"
     depends_on:
-      - db
+      - db-order-service
       - rabbitmq
     networks:
       - tcc-network
@@ -67,8 +85,8 @@ services:
     volumes:
       - ./payment-service:/app
     depends_on:
+      - db-payment-service
       - rabbitmq
-      - order-service
     networks:
       - tcc-network
     logging:
