@@ -10,9 +10,11 @@ services:
     container_name: postgres_db_order_service
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${ORDER_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${ORDER_SERVICE_DB_DB}
+      POSTGRES_HOST: ${ORDER_SERVICE_DB_HOST:-db-order-service}
+      POSTGRES_PORT: ${ORDER_SERVICE_DB_PORT:-5432}
     ports:
       - "5432:5432"
     volumes:
@@ -25,9 +27,11 @@ services:
     container_name: postgres_db_payment_service
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${PAYMENT_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${PAYMENT_SERVICE_DB_DB}
+      POSTGRES_HOST: ${PAYMENT_SERVICE_DB_HOST:-db-payment-service}
+      POSTGRES_PORT: ${PAYMENT_SERVICE_DB_PORT:-5433}
     ports:
       - "5433:5432"
     volumes:
@@ -50,11 +54,11 @@ services:
     container_name: order_service
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${ORDER_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${ORDER_SERVICE_DB_DB}
+      POSTGRES_HOST: ${ORDER_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${ORDER_SERVICE_DB_PORT}
     expose:
       - "8000"
     depends_on:
@@ -80,8 +84,13 @@ services:
     container_name: payment_service
     restart: always
     environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONIOENCODING=utf-8
+      POSTGRES_USER: ${PAYMENT_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${PAYMENT_SERVICE_DB_DB}
+      POSTGRES_HOST: ${PAYMENT_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${PAYMENT_SERVICE_DB_PORT}
+    expose:
+      - "8001"
     volumes:
       - ./payment-service:/app
     depends_on:
@@ -89,11 +98,6 @@ services:
       - rabbitmq
     networks:
       - tcc-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 networks:
   tcc-network:

@@ -9,8 +9,8 @@ load_dotenv()
 DB = os.environ.get("POSTGRES_DB")
 USER = os.environ.get("POSTGRES_USER")
 PASSWORD = os.environ.get("POSTGRES_PASSWORD")
-PORT = os.environ.get("POSTGRES_PORT", "5432")
-HOST = os.environ.get("POSTGRES_HOST", "localhost")
+PORT = os.environ.get("POSTGRES_PORT")
+HOST = os.environ.get("POSTGRES_HOST")
 
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{USER}:{PASSWORD}@{HOST}/{DB}"
