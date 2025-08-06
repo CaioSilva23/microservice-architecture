@@ -1,17 +1,16 @@
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 WORKDIR /app
-
-# Configurar variáveis de ambiente para logs
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
-ENV PYTHONPATH=/app
 
 # Copiar requirements e instalar dependências
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código da aplicação
-COPY . /app
+COPY . ./
 
-CMD ["python", "-u", "main.py"]
+# Expor porta
+EXPOSE 8001
+
+# Comando para executar a aplicação
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]

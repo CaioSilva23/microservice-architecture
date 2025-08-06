@@ -1,15 +1,16 @@
 from fastapi import FastAPI
 import uvicorn
 from orders.routers.orders_routers import router
-from shared.database import Base, engine
-from payment_consumer import start_payment_event_consumer
+from shared.consumer import start_payment_event_consumer
+
+# from shared.database import Base, engine
 
 # Importar os models para que o SQLAlchemy os reconheça
-from orders.models.order import Order
+# from orders.models.order import Order
 
 
-Base.metadata.drop_all(bind=engine)
-Base.metadata.create_all(bind=engine)
+# Base.metadata.drop_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 
 def init_payment_consumer():

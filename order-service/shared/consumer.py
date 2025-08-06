@@ -160,13 +160,13 @@ def start_payment_event_consumer():
     logger.info("Consumidor de eventos de pagamento iniciado em background")
 
 
-if __name__ == "__main__":
-    # Para teste isolado
-    start_payment_event_consumer()
+# if __name__ == "__main__":
+#     # Para teste isolado
+#     start_payment_event_consumer()
 
-    # Manter o processo vivo
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Consumidor de pagamentos finalizado")
+#     # Manter o processo vivo
+#     try:
+#         while True:
+#             time.sleep(1)
+#     except KeyboardInterrupt:
+#         logger.info("Consumidor de pagamentos finalizado")
