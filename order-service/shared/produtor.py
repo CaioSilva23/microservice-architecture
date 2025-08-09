@@ -15,15 +15,6 @@ def publish_message(event: dict):
     # Declara o exchange do tipo fanout (broadcast)
     canal.exchange_declare(exchange='order.created', exchange_type='fanout', durable=True)
 
-    # Declarar fila
-    canal.queue_declare(queue="order_queue")
-
-    # Binding da fila ao exchange
-    canal.queue_bind(
-        exchange='order.created',
-        queue='order_queue',
-        routing_key=''
-    )
 
     # Serializa o evento para JSON
     corpo_mensagem = json.dumps(event)

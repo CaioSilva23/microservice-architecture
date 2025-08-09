@@ -99,30 +99,30 @@ def start_payment_event_consumer():
     def consumer_thread():
         retries = 5
         delay = 5
-        
+
         for attempt in range(retries):
             try:
                 logger.info(f"=== INICIANDO CONSUMIDOR DE EVENTOS DE PAGAMENTO (Tentativa {attempt + 1}/{retries}) ===")
-                
+
                 # Aguardar um pouco antes de tentar conectar
                 if attempt > 0:
                     logger.info(f"Aguardando {delay} segundos antes de tentar novamente...")
                     time.sleep(delay)
-                
+
                 conexao = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
                 canal = conexao.channel()
 
                 logger.info("Configurando consumidor da fila payment_queue...")
 
-                # Declara o mesmo exchange usado pelo produtor
-                canal.exchange_declare(exchange='payment.process', exchange_type='direct', durable=True)
+                # Declara o exchange fanout usado pelo produtor
+                canal.exchange_declare(exchange='payment.events', exchange_type='fanout', durable=True)
 
-                # Usa a mesma fila que o produtor está publicando
-                nome_fila = 'payment_queue'
+                # Cria fila específica para o order-service
+                nome_fila = 'payment.events.order-service'
                 canal.queue_declare(queue=nome_fila, durable=True)
 
-                # Liga a fila ao exchange com a mesma routing key vazia
-                canal.queue_bind(exchange='payment.process', queue=nome_fila, routing_key='')
+                # Liga a fila ao exchange fanout
+                canal.queue_bind(exchange='payment.events', queue=nome_fila)
 
                 logger.info(f"[🎧] Aguardando eventos 'PaymentProcessed' na fila {nome_fila}...")
 
