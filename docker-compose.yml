@@ -3,6 +3,8 @@ volumes:
     driver: local
   pg-data-payment-service:
     driver: local
+  pg-data-notification-service:
+    driver: local
 
 services:
   db-order-service:
@@ -36,6 +38,23 @@ services:
       - "5433:5432"
     volumes:
       - pg-data-payment-service:/var/lib/postgresql/data
+    networks:
+      - tcc-network
+  
+  db-notification-service:
+    image: postgres:latest
+    container_name: postgres_db_notification_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_SERVICE_DB_DB}
+      POSTGRES_HOST: ${NOTIFICATION_SERVICE_DB_HOST:-db-notification-service}
+      POSTGRES_PORT: ${NOTIFICATION_SERVICE_DB_PORT:-5433}
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg-data-notification-service:/var/lib/postgresql/data
     networks:
       - tcc-network
 
@@ -76,6 +95,8 @@ services:
       - "80:80"
     depends_on:
       - order-service
+      - payment-service
+      - notification-service
     networks:
       - tcc-network
   
@@ -95,6 +116,26 @@ services:
       - ./payment-service:/app
     depends_on:
       - db-payment-service
+      - rabbitmq
+    networks:
+      - tcc-network
+
+  notification-service:
+    build: './notification-service'
+    container_name: notification_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_SERVICE_DB_DB}
+      POSTGRES_HOST: ${NOTIFICATION_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${NOTIFICATION_SERVICE_DB_PORT}
+    expose:
+      - "8002"
+    volumes:
+      - ./notification-service:/app
+    depends_on:
+      - db-notification-service
       - rabbitmq
     networks:
       - tcc-network
