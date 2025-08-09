@@ -3,11 +3,10 @@ import json
 import time
 import logging
 import sys
-from shared.produtor import publish_message
 import threading
 from sqlalchemy.orm import sessionmaker
 from shared.database import engine
-from payments.models.payment import Payment
+from notifications.models.notification import Notification
 
 
 # Configuração de logging para Docker
@@ -25,62 +24,100 @@ logger = logging.getLogger(__name__)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def create_log_payment_event(order_id, status, valor):
-    """Cria um log de evento de pagamento"""
-    logger.info(f"Salvando registro de pagamento - Pedido ID: {order_id}, Status: {status}, Valor: {valor}")
-    # Aqui você pode adicionar a lógica para salvar o pagamento no banco de dados
+def create_log_notification_event(order_id, status, mensagem):
+    """Cria um log de evento de notificação"""
+    logger.info(f"Salvando registro de notificação - Pedido ID: {order_id}, "
+                f"Status: {status}, Mensagem: {mensagem}")
 
     db = SessionLocal()
     try:
-        payment = Payment(pedido_id=order_id, status=status, valor=valor)
-        db.add(payment)
+        notification = Notification(
+            pedido_id=order_id,
+            status=status,
+            mensagem=mensagem
+        )
+        db.add(notification)
         db.commit()
-        logger.info(f"Registro de pagamento salvo com sucesso - Pedido ID: {order_id}, Status: {status}, Valor: {valor}")
+        logger.info(f"Registro de notificação salvo com sucesso - "
+                    f"Pedido ID: {order_id}, Status: {status}")
     except Exception as e:
-        logger.error(f"Erro ao salvar registro de pagamento - Pedido ID: {order_id}, Status: {status}, Valor: {valor}, Erro: {e}")
+        logger.error(f"Erro ao salvar registro de notificação - "
+                     f"Pedido ID: {order_id}, Status: {status}, Erro: {e}")
         db.rollback()
     finally:
         db.close()
 
 
-def process_payment(ch, method, properties, body):
+def process_order_notification(ch, method, properties, body):
+    """Processa notificações de eventos de pedidos criados"""
     evento = json.loads(body)
-    logger.info(f"[✔] PedidoCriado recebido: {evento}")
+    logger.info(f"[✔] Evento de Pedido recebido: {evento}")
 
-    # Simular o processamento (ex: iniciar pagamento)
+    # Simular o processamento (ex: iniciar notificação)
     payload = evento.get('order_data', {})
 
     pedido_codigo = payload.get("codigo")
     pedido_id = payload.get("id")
-    valor = payload.get("valor")
-    logger.info(f"→ Iniciando processamento de pagamento para o pedido {pedido_codigo}")
-    time.sleep(5)  # Simula o tempo de processamento
+    status = payload.get("status")
+    logger.info(f"→ Iniciando notificação para o pedido {pedido_codigo}")
+    time.sleep(2)  # Simula o tempo de processamento
 
-    # Logica para salvar o pagamento no banco de dados
-    # Aqui você pode adicionar a lógica para salvar o pagamento no banco de dados
-    create_log_payment_event(order_id=pedido_id, status="SUCCESS", valor=valor)
+    # Salvar notificação no banco de dados
+    create_log_notification_event(
+        order_id=pedido_id,
+        status=status,
+        mensagem=f"Pedido {pedido_codigo} criado com status: {status}"
+    )
 
-    publish_message({
-        "evento": "PaymentProcessed",
-        "codigo": pedido_codigo,
-        "id": pedido_id,
-        "valor": valor,
-        "status": "SUCCESS",
-        "data": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
-        "metadata": {
-            "source": "payment-service",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
-        }
-    })
-
-    logger.info(f"[✔] Pagamento processado com sucesso para o pedido {pedido_codigo}")
+    logger.info(f"[✔] Notificação de criação de pedido enviada para o "
+                f"pedido {pedido_codigo}")
 
     # Confirma que a mensagem foi processada
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_payment_orders_creator_consumer():
-    """Função principal para iniciar o consumidor RabbitMQ"""
+def process_payment_notification(ch, method, properties, body):
+    """Processa notificações de eventos de pagamentos processados"""
+    evento = json.loads(body)
+    logger.info(f"[✔] Evento de Pagamento recebido: {evento}")
+
+    # Extrair dados do evento de pagamento
+    pedido_codigo = evento.get("codigo")
+    pedido_id = evento.get("id")
+    status = evento.get("status")
+    valor = evento.get("valor")
+
+    logger.info(f"→ Iniciando notificação de pagamento para o "
+                f"pedido {pedido_codigo}")
+    time.sleep(2)  # Simula o tempo de processamento
+
+    # Determinar mensagem baseada no status do pagamento
+    if status == "SUCCESS":
+        mensagem = (f"Pagamento do pedido {pedido_codigo} foi processado "
+                    f"com sucesso! Valor: R$ {valor}")
+    elif status == "FAILED":
+        mensagem = (f"Falha no pagamento do pedido {pedido_codigo}. "
+                    f"Valor: R$ {valor}")
+    else:
+        mensagem = (f"Pagamento do pedido {pedido_codigo} está em "
+                    f"processamento. Valor: R$ {valor}")
+
+    # Salvar notificação no banco de dados
+    create_log_notification_event(
+        order_id=pedido_id,
+        status=status,
+        mensagem=mensagem
+    )
+
+    logger.info(f"[✔] Notificação de pagamento enviada para o "
+                f"pedido {pedido_codigo}")
+
+    # Confirma que a mensagem foi processada
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def process_notification_for_order():
+    """Função principal para iniciar o consumidor de eventos de pedidos"""
     def consumer_thread():
         retries = 5
         delay = 5
@@ -89,58 +126,106 @@ def process_payment_orders_creator_consumer():
             try:
                 # Aguardar um pouco antes de tentar conectar
                 if attempt > 0:
-                    logger.info(f"Aguardando {delay} segundos antes de tentar novamente...")
+                    logger.info(f"Aguardando {delay} segundos antes de "
+                                "tentar novamente...")
                     time.sleep(delay)
 
-                logger.info(f"💳 Tentativa {attempt + 1}/{retries} de conectar ao RabbitMQ...")
-                connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+                logger.info(f"📝 Tentativa {attempt + 1}/{retries} de "
+                            "conectar ao RabbitMQ para eventos de pedidos...")
+                connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(host='rabbitmq')
+                )
                 channel = connection.channel()
 
-                # Declara o exchange e a fila
-                channel.exchange_declare(exchange='order.created', exchange_type='fanout', durable=True)
-                queue_name = 'order_payment'
-                channel.queue_declare(queue=queue_name, durable=True)
-                channel.queue_bind(exchange='order.created', queue=queue_name)
+                # Declara o exchange e a fila para eventos de pedidos
+                channel.exchange_declare(
+                    exchange='order.created',
+                    exchange_type='fanout',
+                    durable=True
+                )
 
-                logger.info(f"[🎧] Aguardando eventos 'PedidoCriado' na fila {queue_name}...")
+                queue_name = 'order_notification'
+                channel.queue_declare(queue=queue_name, durable=True)
+                channel.queue_bind(
+                    exchange='order.created',
+                    queue=queue_name
+                )
+
+                logger.info(f"[🎧] Aguardando eventos de pedidos na fila "
+                            f"{queue_name}...")
 
                 # Define o callback para processar mensagens
-                channel.basic_consume(queue=queue_name, on_message_callback=process_payment)
+                channel.basic_consume(
+                    queue=queue_name,
+                    on_message_callback=process_order_notification
+                )
 
                 # Inicia o consumo
                 channel.start_consuming()
                 break  # Se a conexão for bem-sucedida, sai do loop
             except Exception as e:
-                logger.error(f"❌ Erro ao iniciar consumidor: {e}")
+                logger.error(f"❌ Erro ao iniciar consumidor de pedidos: {e}")
                 time.sleep(delay)
 
     # Iniciar consumidor em thread separada para não bloquear a aplicação
     thread = threading.Thread(target=consumer_thread, daemon=True)
     thread.start()
-    logger.info("Consumidor de eventos de 'PedidoCriado' iniciado em background")
+    logger.info("Consumidor de eventos de pedidos iniciado em background")
 
 
+def process_notification_for_payment():
+    """Função principal para iniciar o consumidor de eventos de pagamento"""
+    def consumer_thread():
+        retries = 5
+        delay = 5
 
-    # logger.info("Conectando ao RabbitMQ...")
-    # conexao = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
-    # canal = conexao.channel()
+        for attempt in range(retries):
+            try:
+                # Aguardar um pouco antes de tentar conectar
+                if attempt > 0:
+                    logger.info(f"Aguardando {delay} segundos antes de "
+                                "tentar novamente...")
+                    time.sleep(delay)
 
-    # logger.info("Configurando consumidor da fila order_queue...")
+                logger.info(f"💳 Tentativa {attempt + 1}/{retries} de "
+                            "conectar ao RabbitMQ para eventos de pagamento...")
+                connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(host='rabbitmq')
+                )
+                channel = connection.channel()
 
-    # # Declara o mesmo exchange usado pelo produtor
-    # canal.exchange_declare(exchange='order.created', exchange_type='fanout', durable=True)
+                # Declara o exchange e a fila para eventos de pagamento
+                channel.exchange_declare(
+                    exchange='payment.events',
+                    exchange_type='fanout',
+                    durable=True
+                )
 
-    # # Declara a fila (pode ser uma por serviço)
-    # nome_fila = 'order_payment'
-    # canal.queue_declare(queue=nome_fila, durable=True)
+                queue_name = 'payment_notification'
+                channel.queue_declare(queue=queue_name, durable=True)
+                channel.queue_bind(
+                    exchange='payment.events',
+                    queue=queue_name
+                )
 
-    # # Liga a fila ao exchange
-    # canal.queue_bind(exchange='order.created', queue=nome_fila)
+                logger.info(f"[🎧] Aguardando eventos de pagamento na fila "
+                            f"{queue_name}...")
 
-    # logger.info(f"[🎧] Aguardando eventos 'PedidoCriado' na fila {nome_fila}...")
+                # Define o callback para processar mensagens
+                channel.basic_consume(
+                    queue=queue_name,
+                    on_message_callback=process_payment_notification
+                )
 
-    # # Define o callback para processar mensagens
-    # canal.basic_consume(queue=nome_fila, on_message_callback=process_payment)
+                # Inicia o consumo
+                channel.start_consuming()
+                break  # Se a conexão for bem-sucedida, sai do loop
+            except Exception as e:
+                logger.error(f"❌ Erro ao iniciar consumidor de "
+                             f"pagamentos: {e}")
+                time.sleep(delay)
 
-    # # Inicia o consumo
-    # canal.start_consuming()
+    # Iniciar consumidor em thread separada para não bloquear a aplicação
+    thread = threading.Thread(target=consumer_thread, daemon=True)
+    thread.start()
+    logger.info("Consumidor de eventos de pagamentos iniciado em background")
