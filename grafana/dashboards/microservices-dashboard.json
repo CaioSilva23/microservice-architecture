@@ -1,0 +1,128 @@
+{
+  "id": null,
+  "title": "TCC Project - Microservices Monitoring",
+  "tags": ["microservices", "tcc"],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(order_service_requests_total[5m]))",
+            "legendFormat": "Order Service"
+          },
+          {
+            "expr": "sum(rate(payment_service_requests_total[5m]))",
+            "legendFormat": "Payment Service"
+          },
+          {
+            "expr": "sum(rate(notification_service_requests_total[5m]))",
+            "legendFormat": "Notification Service"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(order_service_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "Order Service P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(payment_service_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "Payment Service P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(notification_service_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "Notification Service P95"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "HTTP Status Codes",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(order_service_requests_total[5m]))",
+            "legendFormat": "Order Service {{status}}"
+          },
+          {
+            "expr": "sum by (status) (rate(payment_service_requests_total[5m]))",
+            "legendFormat": "Payment Service {{status}}"
+          },
+          {
+            "expr": "sum by (status) (rate(notification_service_requests_total[5m]))",
+            "legendFormat": "Notification Service {{status}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "{{datname}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 5,
+        "title": "RabbitMQ Queue Messages",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rabbitmq_queue_messages",
+            "legendFormat": "{{queue}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "refresh": "5s",
+  "version": 1,
+  "uid": "microservices-monitoring"
+}
