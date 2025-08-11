@@ -1,7 +1,7 @@
 {
   "id": null,
-  "title": "TCC Project - Microservices Monitoring",
-  "tags": ["microservices", "tcc"],
+  "title": "TCC Project - Enhanced Microservices Monitoring",
+  "tags": ["microservices", "tcc", "observability"],
   "style": "dark",
   "timezone": "browser",
   "editable": true,
@@ -9,8 +9,88 @@
   "panels": [
       {
         "id": 1,
-        "title": "Request Rate",
+        "title": "Service Health Status",
         "type": "stat",
+        "targets": [
+          {
+            "expr": "order_service_health_status",
+            "legendFormat": "Order Service"
+          },
+          {
+            "expr": "payment_service_health_status",
+            "legendFormat": "Payment Service"
+          },
+          {
+            "expr": "notification_service_health_status",
+            "legendFormat": "Notification Service"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "UNHEALTHY",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "HEALTHY",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Service Uptime",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "order_service_uptime_seconds",
+            "legendFormat": "Order Service"
+          },
+          {
+            "expr": "payment_service_uptime_seconds",
+            "legendFormat": "Payment Service"
+          },
+          {
+            "expr": "notification_service_uptime_seconds",
+            "legendFormat": "Notification Service"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Request Rate",
+        "type": "graph",
         "targets": [
           {
             "expr": "sum(rate(order_service_requests_total[5m]))",
@@ -29,12 +109,12 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 0
+          "y": 8
         }
       },
       {
-        "id": 2,
-        "title": "Response Time",
+        "id": 4,
+        "title": "Response Time P95",
         "type": "graph",
         "targets": [
           {
@@ -54,54 +134,167 @@
           "h": 8,
           "w": 12,
           "x": 12,
-          "y": 0
-        }
-      },
-      {
-        "id": 3,
-        "title": "HTTP Status Codes",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "sum by (status) (rate(order_service_requests_total[5m]))",
-            "legendFormat": "Order Service {{status}}"
-          },
-          {
-            "expr": "sum by (status) (rate(payment_service_requests_total[5m]))",
-            "legendFormat": "Payment Service {{status}}"
-          },
-          {
-            "expr": "sum by (status) (rate(notification_service_requests_total[5m]))",
-            "legendFormat": "Notification Service {{status}}"
-          }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 24,
-          "x": 0,
           "y": 8
         }
       },
       {
-        "id": 4,
-        "title": "Database Connections",
+        "id": 5,
+        "title": "Circuit Breaker Status",
         "type": "graph",
         "targets": [
           {
-            "expr": "pg_stat_database_numbackends",
-            "legendFormat": "{{datname}}"
+            "expr": "order_service_circuit_breaker_state",
+            "legendFormat": "Order {{dependency}}"
+          },
+          {
+            "expr": "payment_service_circuit_breaker_state",
+            "legendFormat": "Payment {{dependency}}"
+          },
+          {
+            "expr": "notification_service_circuit_breaker_state",
+            "legendFormat": "Notification {{dependency}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {"text": "CLOSED", "color": "green"},
+                  "1": {"text": "OPEN", "color": "red"},
+                  "2": {"text": "HALF-OPEN", "color": "yellow"}
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "HTTP Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(order_service_requests_total{status=~\"5..\"}[5m])) / sum(rate(order_service_requests_total[5m]))",
+            "legendFormat": "Order Service 5xx Rate"
+          },
+          {
+            "expr": "sum(rate(payment_service_requests_total{status=~\"5..\"}[5m])) / sum(rate(payment_service_requests_total[5m]))",
+            "legendFormat": "Payment Service 5xx Rate"
+          },
+          {
+            "expr": "sum(rate(notification_service_requests_total{status=~\"5..\"}[5m])) / sum(rate(notification_service_requests_total[5m]))",
+            "legendFormat": "Notification Service 5xx Rate"
           }
         ],
         "gridPos": {
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 16
+          "y": 24
         }
       },
       {
-        "id": 5,
-        "title": "RabbitMQ Queue Messages",
+        "id": 7,
+        "title": "Message Queue Processing",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(order_service_rabbitmq_messages_total{status=\"success\"}[5m]))",
+            "legendFormat": "Order Service Success"
+          },
+          {
+            "expr": "sum(rate(payment_service_rabbitmq_messages_total{status=\"success\"}[5m]))",
+            "legendFormat": "Payment Service Success"
+          },
+          {
+            "expr": "sum(rate(notification_service_rabbitmq_messages_total{status=\"success\"}[5m]))",
+            "legendFormat": "Notification Service Success"
+          },
+          {
+            "expr": "sum(rate(order_service_rabbitmq_messages_total{status=\"error\"}[5m]))",
+            "legendFormat": "Order Service Errors"
+          },
+          {
+            "expr": "sum(rate(payment_service_rabbitmq_messages_total{status=\"error\"}[5m]))",
+            "legendFormat": "Payment Service Errors"
+          },
+          {
+            "expr": "sum(rate(notification_service_rabbitmq_messages_total{status=\"error\"}[5m]))",
+            "legendFormat": "Notification Service Errors"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        }
+      },
+      {
+        "id": 8,
+        "title": "Recovery Time Distribution",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(order_service_recovery_time_seconds_bucket[5m]))",
+            "legendFormat": "Order Service P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(order_service_recovery_time_seconds_bucket[5m]))",
+            "legendFormat": "Order Service P95"
+          },
+          {
+            "expr": "histogram_quantile(0.5, rate(payment_service_recovery_time_seconds_bucket[5m]))",
+            "legendFormat": "Payment Service P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(payment_service_recovery_time_seconds_bucket[5m]))",
+            "legendFormat": "Payment Service P95"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        }
+      },
+      {
+        "id": 9,
+        "title": "Dependency Call Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(order_service_dependency_calls_total{status=\"success\"}[5m])) / sum(rate(order_service_dependency_calls_total[5m]))",
+            "legendFormat": "Order Service Success Rate"
+          },
+          {
+            "expr": "sum(rate(payment_service_dependency_calls_total{status=\"success\"}[5m])) / sum(rate(payment_service_dependency_calls_total[5m]))",
+            "legendFormat": "Payment Service Success Rate"
+          },
+          {
+            "expr": "sum(rate(notification_service_dependency_calls_total{status=\"success\"}[5m])) / sum(rate(notification_service_dependency_calls_total[5m]))",
+            "legendFormat": "Notification Service Success Rate"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 40
+        }
+      },
+      {
+        "id": 10,
+        "title": "RabbitMQ Queue Depth",
         "type": "graph",
         "targets": [
           {
@@ -113,7 +306,7 @@
           "h": 8,
           "w": 12,
           "x": 12,
-          "y": 16
+          "y": 40
         }
       }
   ],
@@ -123,6 +316,6 @@
   },
   "timepicker": {},
   "refresh": "5s",
-  "version": 1,
-  "uid": "microservices-monitoring"
+  "version": 2,
+  "uid": "enhanced-microservices-monitoring"
 }

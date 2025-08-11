@@ -1,0 +1,138 @@
+groups:
+  - name: microservices-health-alerts
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute."
+
+      - alert: ServiceUnhealthy
+        expr: order_service_health_status == 0 or payment_service_health_status == 0 or notification_service_health_status == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service health check failing"
+          description: "Service health check is failing. Check dependencies."
+
+  - name: microservices-performance-alerts
+    rules:
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(order_service_request_duration_seconds_bucket[5m])) > 2.0 or histogram_quantile(0.95, rate(payment_service_request_duration_seconds_bucket[5m])) > 2.0 or histogram_quantile(0.95, rate(notification_service_request_duration_seconds_bucket[5m])) > 2.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 2 seconds for more than 2 minutes."
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(order_service_requests_total{status=~"5.."}[5m])) /
+            sum(rate(order_service_requests_total[5m]))
+          ) > 0.05 or
+          (
+            sum(rate(payment_service_requests_total{status=~"5.."}[5m])) /
+            sum(rate(payment_service_requests_total[5m]))
+          ) > 0.05 or
+          (
+            sum(rate(notification_service_requests_total{status=~"5.."}[5m])) /
+            sum(rate(notification_service_requests_total[5m]))
+          ) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate"
+          description: "HTTP 5xx error rate is above 5% for more than 1 minute."
+
+  - name: microservices-circuit-breaker-alerts
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: order_service_circuit_breaker_state == 1 or payment_service_circuit_breaker_state == 1 or notification_service_circuit_breaker_state == 1
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker for {{ $labels.dependency }} is open, indicating repeated failures."
+
+      - alert: CircuitBreakerHalfOpen
+        expr: order_service_circuit_breaker_state == 2 or payment_service_circuit_breaker_state == 2 or notification_service_circuit_breaker_state == 2
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker in half-open state"
+          description: "Circuit breaker for {{ $labels.dependency }} is testing recovery."
+
+  - name: microservices-dependency-alerts
+    rules:
+      - alert: LowDependencySuccessRate
+        expr: |
+          (
+            sum(rate(order_service_dependency_calls_total{status="success"}[5m])) /
+            sum(rate(order_service_dependency_calls_total[5m]))
+          ) < 0.9 or
+          (
+            sum(rate(payment_service_dependency_calls_total{status="success"}[5m])) /
+            sum(rate(payment_service_dependency_calls_total[5m]))
+          ) < 0.9 or
+          (
+            sum(rate(notification_service_dependency_calls_total{status="success"}[5m])) /
+            sum(rate(notification_service_dependency_calls_total[5m]))
+          ) < 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low dependency success rate"
+          description: "Dependency call success rate is below 90% for more than 2 minutes."
+
+      - alert: HighMessageQueueDepth
+        expr: rabbitmq_queue_messages > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High message queue depth"
+          description: "Queue {{ $labels.queue }} has more than 100 messages for 5 minutes."
+
+  - name: microservices-recovery-alerts
+    rules:
+      - alert: SlowRecoveryTime
+        expr: histogram_quantile(0.95, rate(payment_service_recovery_time_seconds_bucket[5m])) > 10 or histogram_quantile(0.95, rate(order_service_recovery_time_seconds_bucket[5m])) > 10
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow recovery time detected"
+          description: "95th percentile recovery time is above 10 seconds."
+
+  - name: microservices-business-alerts
+    rules:
+      - alert: HighMessageProcessingFailureRate
+        expr: |
+          (
+            sum(rate(order_service_rabbitmq_messages_total{status="error"}[5m])) /
+            sum(rate(order_service_rabbitmq_messages_total[5m]))
+          ) > 0.1 or
+          (
+            sum(rate(payment_service_rabbitmq_messages_total{status="error"}[5m])) /
+            sum(rate(payment_service_rabbitmq_messages_total[5m]))
+          ) > 0.1 or
+          (
+            sum(rate(notification_service_rabbitmq_messages_total{status="error"}[5m])) /
+            sum(rate(notification_service_rabbitmq_messages_total[5m]))
+          ) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High message processing failure rate"
+          description: "Message processing failure rate is above 10% for more than 2 minutes."
