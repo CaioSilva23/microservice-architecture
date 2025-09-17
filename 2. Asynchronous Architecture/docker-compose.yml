@@ -1,0 +1,224 @@
+volumes:
+  pg-data-order-service-hybrid-architecture:
+    driver: local
+  pg-data-payment-service-hybrid-architecture:
+    driver: local
+  pg-data-notification-service-hybrid-architecture:
+    driver: local
+  grafana-storage:
+
+services:
+  db-order-service-hybrid-architecture:
+    image: postgres:latest
+    container_name: postgres_db_order_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${ORDER_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${ORDER_SERVICE_DB_DB}
+      POSTGRES_HOST: ${ORDER_SERVICE_DB_HOST:-db-order-service-hybrid-architecture}
+      POSTGRES_PORT: ${ORDER_SERVICE_DB_PORT:-5432}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data-order-service-hybrid-architecture:/var/lib/postgresql/data
+    networks:
+      - tcc-network
+
+  db-payment-service-hybrid-architecture:
+    image: postgres:latest
+    container_name: postgres_db_payment_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${PAYMENT_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${PAYMENT_SERVICE_DB_DB}
+      POSTGRES_HOST: ${PAYMENT_SERVICE_DB_HOST:-db-payment-service-hybrid-architecture}
+      POSTGRES_PORT: ${PAYMENT_SERVICE_DB_PORT:-5433}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-data-payment-service-hybrid-architecture:/var/lib/postgresql/data
+    networks:
+      - tcc-network
+
+  db-notification-service-hybrid-architecture:
+    image: postgres:latest
+    container_name: postgres_db_notification_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_SERVICE_DB_DB}
+      POSTGRES_HOST: ${NOTIFICATION_SERVICE_DB_HOST:-db-notification-service-hybrid-architecture}
+      POSTGRES_PORT: ${NOTIFICATION_SERVICE_DB_PORT:-5433}
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg-data-notification-service-hybrid-architecture:/var/lib/postgresql/data
+    networks:
+      - tcc-network
+
+  rabbitmq-hybrid-architecture:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-hybrid-architecture
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - tcc-network
+
+  order-service-hybrid-architecture:
+    build: './order-service'
+    container_name: order-service-hybrid-architecture
+    restart: always
+    environment:
+      POSTGRES_USER: ${ORDER_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${ORDER_SERVICE_DB_DB}
+      POSTGRES_HOST: ${ORDER_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${ORDER_SERVICE_DB_PORT}
+    expose:
+      - "8000"
+    depends_on:
+      - db-order-service-hybrid-architecture
+      - rabbitmq-hybrid-architecture
+    networks:
+      - tcc-network
+    volumes:
+      - ./order-service:/app
+
+  api-gateway-hybrid-architecture:
+    build: './api-gateway'
+    container_name: api-gateway-hybrid-architecture
+    ports:
+      - "80:80"
+    depends_on:
+      - order-service-hybrid-architecture
+      - payment-service-hybrid-architecture
+      - notification-service-hybrid-architecture
+    networks:
+      - tcc-network
+
+  payment-service-hybrid-architecture:
+    build: './payment-service'
+    container_name: payment-service-hybrid-architecture
+    restart: always
+    environment:
+      POSTGRES_USER: ${PAYMENT_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${PAYMENT_SERVICE_DB_DB}
+      POSTGRES_HOST: ${PAYMENT_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${PAYMENT_SERVICE_DB_PORT}
+    expose:
+      - "8001"
+    volumes:
+      - ./payment-service:/app
+    depends_on:
+      - db-payment-service-hybrid-architecture
+      - rabbitmq-hybrid-architecture
+    networks:
+      - tcc-network
+
+  notification-service-hybrid-architecture:
+    build: './notification-service'
+    container_name: notification-service-hybrid-architecture
+    restart: always
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_SERVICE_DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_SERVICE_DB_DB}
+      POSTGRES_HOST: ${NOTIFICATION_SERVICE_DB_HOST}
+      POSTGRES_PORT: ${NOTIFICATION_SERVICE_DB_PORT}
+    expose:
+      - "8002"
+    volumes:
+      - ./notification-service:/app
+    depends_on:
+      - db-notification-service-hybrid-architecture
+      - rabbitmq-hybrid-architecture
+    networks:
+      - tcc-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - tcc-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./grafana/dashboard-provider.yml:/etc/grafana/provisioning/dashboards/dashboard-provider.yml
+      - ./grafana/dashboards:/etc/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - tcc-network
+
+  postgres-exporter-order:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter_order
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${ORDER_SERVICE_DB_USER}:${ORDER_SERVICE_DB_PASSWORD}@db-order-service-hybrid-architecture:5432/${ORDER_SERVICE_DB_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - db-order-service-hybrid-architecture
+    networks:
+      - tcc-network
+
+  postgres-exporter-payment:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter_payment
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PAYMENT_SERVICE_DB_USER}:${PAYMENT_SERVICE_DB_PASSWORD}@db-payment-service-hybrid-architecture:5432/${PAYMENT_SERVICE_DB_DB}?sslmode=disable"
+    ports:
+      - "9188:9187"
+    depends_on:
+      - db-payment-service-hybrid-architecture
+    networks:
+      - tcc-network
+
+  postgres-exporter-notification:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter_notification
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${NOTIFICATION_SERVICE_DB_USER}:${NOTIFICATION_SERVICE_DB_PASSWORD}@db-notification-service-hybrid-architecture:5432/${NOTIFICATION_SERVICE_DB_DB}?sslmode=disable"
+    ports:
+      - "9189:9187"
+    depends_on:
+      - db-notification-service-hybrid-architecture
+    networks:
+      - tcc-network
+
+networks:
+  tcc-network:
+    driver: bridge
