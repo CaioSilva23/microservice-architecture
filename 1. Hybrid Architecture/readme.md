@@ -1,8 +1,24 @@
-# Projeto TCC - Arquitetura de Microsserviços
+# Arquitetura Híbrida para Comunicação entre Microsserviços com API Gateway e Mensageria
 
 ## 📋 Sobre o Projeto
 
-Este projeto implementa uma arquitetura de microsserviços para um sistema de e-commerce, desenvolvido como trabalho de conclusão de curso (TCC). O sistema é composto por três serviços principais que trabalham de forma independente e se comunicam através de mensageria assíncrona.
+Este projeto implementa uma **arquitetura híbrida** para comunicação entre microsserviços, combinando chamadas síncronas via API Gateway (NGINX) com comunicação assíncrona baseada em mensageria (RabbitMQ). Desenvolvido como trabalho de conclusão de curso (TCC), o sistema demonstra os benefícios da abordagem híbrida em termos de desempenho, tolerância a falhas e robustez comparado a modelos exclusivamente síncronos ou assíncronos.
+
+O sistema é composto por três microsserviços principais — Order Service, Payment Service e Notification Service — que se comunicam através de uma combinação estratégica de REST via NGINX e eventos via RabbitMQ.
+
+## 🎯 Objetivo do Estudo
+
+Este protótipo faz parte de uma pesquisa experimental que visa **analisar e validar empiricamente os benefícios da arquitetura híbrida** de comunicação entre microsserviços. O estudo compara três abordagens distintas:
+
+1. **REST Puro (NGINX)** - Comunicação exclusivamente síncrona
+2. **Mensageria Pura (RabbitMQ)** - Comunicação exclusivamente assíncrona  
+3. **Híbrida (NGINX + RabbitMQ)** - Combinação estratégica de ambas
+
+### Perguntas de Pesquisa
+
+- **Q1**: O modelo híbrido mantém latência próxima à comunicação síncrona?
+- **Q2**: Ele reduz o impacto em cascata e o tempo de recuperação, aproximando-se da comunicação assíncrona?
+- **Q3**: Quais trade-offs operacionais emergem em termos de complexidade e observabilidade frente aos ganhos de resiliência?
 
 ## 🏗️ Arquitetura dos Serviços
 
@@ -12,16 +28,13 @@ Este projeto implementa uma arquitetura de microsserviços para um sistema de e-
 - **💳 Serviço de Pagamentos (Payment Service)**: Realiza o processamento do pagamento e validação das transações
 - **📧 Serviço de Notificações (Notification Service)**: Envia notificações ao usuário com base em eventos do sistema
 
-### Componentes de Infraestrutura
+### Arquitetura Híbrida (NGINX + RabbitMQ)
 
-- **🚪 API Gateway**: NGINX com suporte a autenticação e roteamento inteligente
-- **📨 Mensageria**: RabbitMQ para comunicação assíncrona entre serviços
-- **📊 Monitoramento**: 
-  - Prometheus para coleta de métricas
-  - Grafana para visualização de dashboards
-- **🧪 Testes**:
-  - Locust para testes de carga e simulação de requisições simultâneas
-  - Scripts manuais para testes de falha e simulação de indisponibilidades
+Este protótipo implementa o **modelo híbrido** que combina:
+
+- **🚪 API Gateway (NGINX)**: Ponto único de entrada para chamadas síncronas externas, proporcionando controle, segurança e roteamento inteligente
+- **📨 Mensageria (RabbitMQ)**: Comunicação assíncrona para eventos internos, promovendo desacoplamento e tolerância a falhas
+- **⚖️ Equilíbrio**: Mantém latência próxima à comunicação síncrona enquanto reduz impacto de falhas em cascata
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -34,13 +47,29 @@ Este projeto implementa uma arquitetura de microsserviços para um sistema de e-
 - **Testes de Performance**: Locust
 - **Banco de Dados**: [Especificar quando implementado]
 
-## 📈 Métricas Monitoradas
+## 📈 Métricas Monitoradas para Comparação
 
-- ⏱️ Tempo de resposta das APIs
-- ❌ Número de falhas e erros
-- 📊 Volume de mensagens processadas
-- 🔄 Taxa de throughput por serviço
-- 💾 Uso de recursos (CPU, memória)
+Este protótipo coleta métricas específicas para comparação experimental:
+
+### Desempenho
+- ⏱️ **Latência média e P95** das requisições HTTP
+- 🔄 **Throughput** (requisições por segundo)
+- 💾 **Uso de recursos** (CPU, memória, I/O)
+
+### Resiliência  
+- ❌ **Taxa de falhas** durante simulações de indisponibilidade
+- 🔄 **Tempo de recuperação** após falhas dos serviços
+- 🌊 **Propagação de falhas** em cascata
+
+### Observabilidade
+- 📊 **Cobertura de métricas** para troubleshooting
+- � **Facilidade de rastreamento** de requisições
+- 🚨 **Detecção automática** de problemas
+
+### Complexidade
+- � **Linhas de código** por funcionalidade
+- ⚙️ **Configurações** necessárias
+- 🛠️ **Esforço de manutenção** operacional
 
 ## 🚀 Como Executar
 

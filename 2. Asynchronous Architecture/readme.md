@@ -1,8 +1,25 @@
-# Projeto TCC - Arquitetura de Microsserviços
+# Arquitetura de Mensageria Pura (RabbitMQ) - Comunicação Assíncrona entre Microsserviços
 
 ## 📋 Sobre o Projeto
 
-Este projeto implementa uma arquitetura de microsserviços para um sistema de e-commerce, desenvolvido como trabalho de conclusão de curso (TCC). O sistema é composto por três serviços principais que trabalham de forma independente e se comunicam através de mensageria assíncrona.
+Este projeto implementa o **modelo de mensageria pura** com comunicação exclusivamente assíncrona entre microsserviços, utilizando RabbitMQ como sistema de mensageria. Desenvolvido como parte de um trabalho de conclusão de curso (TCC) que investiga diferentes abordagens de comunicação em arquiteturas de microsserviços.
+
+O sistema é composto por três microsserviços principais — Order Service, Payment Service e Notification Service — que se comunicam exclusivamente através de eventos e mensagens via RabbitMQ, demonstrando as características de desacoplamento e resiliência desta abordagem.
+
+## 🎯 Objetivo do Estudo
+
+Este protótipo implementa o **cenário de mensageria pura** como parte de uma pesquisa experimental que compara três abordagens de comunicação entre microsserviços:
+
+1. **REST Puro (NGINX)** - Comunicação exclusivamente síncrona
+2. **Mensageria Pura (RabbitMQ)** - Este protótipo - Comunicação exclusivamente assíncrona  
+3. **Híbrida (NGINX + RabbitMQ)** - Combinação estratégica de ambas
+
+### Características Avaliadas
+
+- **⏱️ Latência**: Tempo de resposta das requisições (maior latência esperada devido ao overhead)
+- **🛡️ Taxa de Falhas**: Tolerância a falhas através do desacoplamento (menor taxa esperada)
+- **🔄 Tempo de Recuperação**: Capacidade de recuperação automática (menor tempo esperado)
+- **🔧 Complexidade**: Gerenciamento de mensageria e eventual consistency (maior complexidade)
 
 ## 🏗️ Arquitetura dos Serviços
 
@@ -12,16 +29,15 @@ Este projeto implementa uma arquitetura de microsserviços para um sistema de e-
 - **💳 Serviço de Pagamentos (Payment Service)**: Realiza o processamento do pagamento e validação das transações
 - **📧 Serviço de Notificações (Notification Service)**: Envia notificações ao usuário com base em eventos do sistema
 
-### Componentes de Infraestrutura
+### Arquitetura de Mensageria Pura (RabbitMQ)
 
-- **🚪 API Gateway**: NGINX com suporte a autenticação e roteamento inteligente
-- **📨 Mensageria**: RabbitMQ para comunicação assíncrona entre serviços
-- **📊 Monitoramento**: 
-  - Prometheus para coleta de métricas
-  - Grafana para visualização de dashboards
-- **🧪 Testes**:
-  - Locust para testes de carga e simulação de requisições simultâneas
-  - Scripts manuais para testes de falha e simulação de indisponibilidades
+Este protótipo implementa o **modelo assíncrono puro** com:
+
+- **📨 Comunicação via Eventos**: Todas as interações entre serviços através de mensagens RabbitMQ
+- **� Desacoplamento Temporal**: Serviços operam independentemente sem dependências diretas
+- **🛡️ Alta Resiliência**: Tolerância a falhas e recuperação automática através de filas persistentes
+- **⏱️ Maior Latência**: Tempo de resposta superior devido ao overhead da mensageria
+- **🔧 Complexidade**: Requer gerenciamento de filas, dead letters e eventual consistency
 
 ## 🛠️ Tecnologias Utilizadas
 

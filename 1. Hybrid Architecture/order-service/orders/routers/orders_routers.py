@@ -31,23 +31,32 @@ def list_orders(db: Session = Depends(get_db)) -> List[OrderResponse]:
 )
 def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderResponse:
     """
-    Função para criar um novo pedido.
-    Se a data não for fornecida, usa a data/hora atual.
-    Retorna o pedido criado.
+    ARQUITETURA HÍBRIDA - Criar novo pedido
+    
+    Esta implementação demonstra o padrão híbrido:
+    1. SÍNCRONO: Persistência imediata no banco (operação crítica)
+    2. ASSÍNCRONO: Notificação de outros serviços via RabbitMQ (não-crítico)
+    
+    Benefícios:
+    - Controle sobre operações críticas (criação do pedido)
+    - Desacoplamento para notificações (reduz falhas em cascata)
+    - Latência otimizada para resposta ao cliente
     """
 
-    # Preparar dados do pedido
+    # ===== FASE SÍNCRONA: Operação Crítica =====
+    # Preparação e persistência imediata no banco de dados (DEVE ser confiável)
     pedido_data = pedido.model_dump()
-
-    # Se data não foi fornecida, usar data atual
+    
     if pedido_data['data'] is None:
         pedido_data['data'] = datetime.now()
 
     novo_pedido = Order(**pedido_data)
     db.add(novo_pedido)
-    db.commit()
+    db.commit()  # Transação confirmada antes de qualquer comunicação externa
     db.refresh(novo_pedido)
 
+    # ===== FASE ASSÍNCRONA: Notificação Não-Crítica =====
+    # Preparação do evento para outros serviços via RabbitMQ
     event = {
             "event_type": "order_realized",
             "event_timestamp": datetime.now().isoformat(),
@@ -63,12 +72,19 @@ def criar_pedido(pedido: OrderRequest, db: Session = Depends(get_db)) -> OrderRe
             ),
             "metadata": {
                 "service": "order-service",
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "communication_pattern": "hybrid_async_notification"
             }
     }
 
-    # Publicar evento de pedido realizado no RabbitMQ
-    publish_message(event=event)
+    # Publicação assíncrona - SE falhar, não compromete a criação do pedido
+    # Este é o diferencial da arquitetura híbrida: desacoplamento seletivo
+    try:
+        publish_message(event=event)
+    except Exception as e:
+        # Log do erro mas NÃO falha a operação principal
+        # O pedido foi criado com sucesso, a notificação pode ser reprocessada
+        print(f"Aviso: Falha na notificação assíncrona: {e}")
 
     return novo_pedido
 

@@ -1,8 +1,25 @@
-# Projeto TCC - Arquitetura de Microsserviços
+# Arquitetura REST Pura (NGINX) - Comunicação Síncrona entre Microsserviços
 
 ## 📋 Sobre o Projeto
 
-Este projeto implementa uma arquitetura de microsserviços para um sistema de e-commerce, desenvolvido como trabalho de conclusão de curso (TCC). O sistema é composto por três serviços principais que trabalham de forma independente e se comunicam através de mensageria assíncrona.
+Este projeto implementa o **modelo REST puro** com comunicação exclusivamente síncrona entre microsserviços, utilizando NGINX como API Gateway. Desenvolvido como parte de um trabalho de conclusão de curso (TCC) que investiga diferentes abordagens de comunicação em arquiteturas de microsserviços.
+
+O sistema é composto por três microsserviços principais — Order Service, Payment Service e Notification Service — que se comunicam exclusivamente através de chamadas HTTP síncronas, demonstrando as características de desempenho e limitações de resiliência desta abordagem.
+
+## 🎯 Objetivo do Estudo
+
+Este protótipo implementa o **cenário REST puro** como parte de uma pesquisa experimental que compara três abordagens de comunicação entre microsserviços:
+
+1. **REST Puro (NGINX)** - Este protótipo - Comunicação exclusivamente síncrona
+2. **Mensageria Pura (RabbitMQ)** - Comunicação exclusivamente assíncrona  
+3. **Híbrida (NGINX + RabbitMQ)** - Combinação estratégica de ambas
+
+### Características Avaliadas
+
+- **⚡ Latência**: Tempo de resposta das requisições (menor latência esperada)
+- **⚠️ Taxa de Falhas**: Susceptibilidade a falhas em cascata (maior taxa esperada)
+- **🔄 Tempo de Recuperação**: Capacidade de recuperação após falhas (maior tempo esperado)
+- **🎯 Simplicidade**: Facilidade de implementação e debugging (maior simplicidade)
 
 ## 🏗️ Arquitetura dos Serviços
 
@@ -12,16 +29,15 @@ Este projeto implementa uma arquitetura de microsserviços para um sistema de e-
 - **💳 Serviço de Pagamentos (Payment Service)**: Realiza o processamento do pagamento e validação das transações
 - **📧 Serviço de Notificações (Notification Service)**: Envia notificações ao usuário com base em eventos do sistema
 
-### Componentes de Infraestrutura
+### Arquitetura REST Pura (NGINX)
 
-- **🚪 API Gateway**: NGINX com suporte a autenticação e roteamento inteligente
-- **📨 Mensageria**: RabbitMQ para comunicação assíncrona entre serviços
-- **📊 Monitoramento**: 
-  - Prometheus para coleta de métricas
-  - Grafana para visualização de dashboards
-- **🧪 Testes**:
-  - Locust para testes de carga e simulação de requisições simultâneas
-  - Scripts manuais para testes de falha e simulação de indisponibilidades
+Este protótipo implementa o **modelo síncrono puro** com:
+
+- **🔗 Comunicação HTTP Direta**: Todas as interações entre serviços via chamadas REST síncronas
+- **� API Gateway (NGINX)**: Roteamento e balanceamento de carga para requisições externas
+- **⚡ Baixa Latência**: Menor tempo de resposta devido à comunicação direta
+- **⚠️ Acoplamento Temporal**: Dependência direta entre serviços pode gerar falhas em cascata
+- **🎯 Simplicidade**: Arquitetura mais simples de implementar e debugar
 
 ## 🛠️ Tecnologias Utilizadas
 
