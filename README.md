@@ -127,7 +127,7 @@ projeto-tcc/
 
 **Autor**: Caio Cesar da Silva Batista
 
-**Instituição**: Centro Universitário Carioca [UniCarioca]
+**Instituição**: USP/Esalq
 
 **Curso**: Especialização em Engenharia de Software
 
